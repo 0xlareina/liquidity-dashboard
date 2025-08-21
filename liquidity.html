@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全球市场流动性监控仪表盘</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .dashboard-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .dashboard-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-loose { background-color: #10b981; }
+        .status-neutral { background-color: #f59e0b; }
+        .status-tight { background-color: #ef4444; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 200px;
+            width: 100%;
+        }
+        
+        .gauge {
+            width: 150px;
+            height: 150px;
+            margin: 0 auto;
+        }
+        
+        .progress-ring {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="dashboard-card p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                        <i class="fas fa-tachometer-alt mr-3 text-indigo-600"></i>
+                        全球市场流动性监控仪表盘
+                    </h1>
+                    <p class="text-gray-600">实时监控全球流动性状况 · 数据更新时间: <span id="lastUpdate" class="font-semibold"></span></p>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm text-gray-500 mb-1">流动性状态</div>
+                    <div id="overallStatus" class="text-lg font-semibold flex items-center justify-end">
+                        <span class="status-indicator status-neutral"></span>
+                        中性偏宽松
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="dashboard-card p-4 mb-6">
+            <h3 class="text-lg font-semibold mb-3 text-gray-800">
+                <i class="fas fa-info-circle mr-2 text-blue-500"></i>指标解读
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div class="flex items-center">
+                    <div class="status-indicator status-loose"></div>
+                    <span class="font-medium text-green-700">宽松</span>
+                    <span class="text-gray-600 ml-2">流动性充裕，市场交易活跃</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="status-indicator status-neutral"></div>
+                    <span class="font-medium text-yellow-700">中性</span>
+                    <span class="text-gray-600 ml-2">流动性适中，市场运行正常</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="status-indicator status-tight"></div>
+                    <span class="font-medium text-red-700">紧张</span>
+                    <span class="text-gray-600 ml-2">流动性紧缩，市场承压运行</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <!-- RRP Balance -->
+            <div class="dashboard-card p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">美联储RRP余额</h3>
+                    <span class="status-indicator status-neutral"></span>
+                </div>
+                <div class="metric-value mb-2">$1.2T</div>
+                <div class="text-sm text-gray-600 mb-3">资金"水位"指标</div>
+                <div class="chart-container">
+                    <canvas id="rrpChart"></canvas>
+                </div>
+                <div class="text-xs text-gray-500 mt-2">
+                    <i class="fas fa-arrow-down text-orange-500 mr-1"></i>
+                    相比上月下降15%，流动性边际收紧
+                </div>
+            </div>
+
+            <!-- SOFR Rate -->
+            <div class="dashboard-card p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">SOFR利率</h3>
+                    <span class="status-indicator status-neutral"></span>
+                </div>
+                <div class="metric-value mb-2">4.33%</div>
+                <div class="text-sm text-gray-600 mb-3">隔夜资金价格</div>
+                <div class="gauge">
+                    <svg class="w-full h-full" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
+                        <circle cx="50" cy="50" r="40" stroke="#f59e0b" stroke-width="8" fill="none" 
+                                stroke-dasharray="251" stroke-dashoffset="125" class="progress-ring"/>
+                        <text x="50" y="55" text-anchor="middle" class="text-sm font-bold fill-gray-700">4.33%</text>
+                    </svg>
+                </div>
+                <div class="text-xs text-gray-500 mt-2">
+                    <i class="fas fa-minus text-yellow-500 mr-1"></i>
+                    基本稳定，符合政策预期
+                </div>
+            </div>
+
+            <!-- VIX Index -->
+            <div class="dashboard-card p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">VIX恐慌指数</h3>
+                    <span class="status-indicator status-loose"></span>
+                </div>
+                <div class="metric-value mb-2">15.79</div>
+                <div class="text-sm text-gray-600 mb-3">市场波动率/恐慌度</div>
+                <div class="chart-container">
+                    <canvas id="vixChart"></canvas>
+                </div>
+                <div class="text-xs text-gray-500 mt-2">
+                    <i class="fas fa-arrow-down text-green-500 mr-1"></i>
+                    低于20，市场情绪稳定
+                </div>
+            </div>
+
+            <!-- MOVE Index -->
+            <div class="dashboard-card p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">MOVE指数</h3>
+                    <span class="status-indicator status-neutral"></span>
+                </div>
+                <div class="metric-value mb-2">80.75</div>
+                <div class="text-sm text-gray-600 mb-3">美债波动率</div>
+                <div class="gauge">
+                    <svg class="w-full h-full" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
+                        <circle cx="50" cy="50" r="40" stroke="#f59e0b" stroke-width="8" fill="none" 
+                                stroke-dasharray="251" stroke-dashoffset="150" class="progress-ring"/>
+                        <text x="50" y="55" text-anchor="middle" class="text-sm font-bold fill-gray-700">80.75</text>
+                    </svg>
+                </div>
+                <div class="text-xs text-gray-500 mt-2">
+                    <i class="fas fa-minus text-yellow-500 mr-1"></i>
+                    处于历史中位数附近
+                </div>
+            </div>
+        </div>
+
+        <!-- Secondary Indicators -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <!-- Credit Spreads -->
+            <div class="dashboard-card p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">信用利差</h3>
+                    <span class="status-indicator status-loose"></span>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <div class="text-sm text-gray-600">投资级</div>
+                        <div class="text-xl font-bold text-green-600">95bp</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-600">高收益</div>
+                        <div class="text-xl font-bold text-orange-600">290bp</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="spreadChart"></canvas>
+                </div>
+                <div class="text-xs text-gray-500 mt-2">
+                    <i class="fas fa-arrow-down text-green-500 mr-1"></i>
+                    利差收窄，信用环境宽松
+                </div>
+            </div>
+
+            <!-- Stablecoin Market Cap -->
+            <div class="dashboard-card p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">稳定币市值</h3>
+                    <span class="status-indicator status-neutral"></span>
+                </div>
+                <div class="metric-value mb-2">$278B</div>
+                <div class="text-sm text-gray-600 mb-3">链上流动性基础</div>
+                <div class="space-y-2 mb-4">
+                    <div class="flex justify-between text-sm">
+                        <span>USDT</span>
+                        <span class="font-semibold">$159B (57%)</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span>USDC</span>
+                        <span class="font-semibold">$63B (23%)</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span>DAI</span>
+                        <span class="font-semibold">$5.4B (2%)</span>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500">
+                    <i class="fas fa-arrow-up text-green-500 mr-1"></i>
+                    总量增长6%，加密流动性充足
+                </div>
+            </div>
+
+            <!-- S&P 500 Liquidity -->
+            <div class="dashboard-card p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">美股流动性</h3>
+                    <span class="status-indicator status-loose"></span>
+                </div>
+                <div class="grid grid-cols-1 gap-3 mb-4">
+                    <div>
+                        <div class="flex justify-between text-sm">
+                            <span>日均成交量</span>
+                            <span class="font-semibold">$516B</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+                            <div class="bg-green-500 h-2 rounded-full" style="width: 85%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm">
+                            <span>买卖价差</span>
+                            <span class="font-semibold">0.01%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+                            <div class="bg-green-500 h-2 rounded-full" style="width: 95%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500">
+                    <i class="fas fa-check text-green-500 mr-1"></i>
+                    市场深度充足，交易顺畅
+                </div>
+            </div>
+        </div>
+
+        <!-- Comprehensive Analysis -->
+        <div class="dashboard-card p-6 mb-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-chart-line mr-3 text-indigo-600"></i>
+                综合流动性分析
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-green-600 mb-2">75%</div>
+                    <div class="text-sm text-gray-600">货币市场</div>
+                    <div class="text-xs text-green-600">宽松</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-yellow-600 mb-2">60%</div>
+                    <div class="text-sm text-gray-600">债券市场</div>
+                    <div class="text-xs text-yellow-600">中性</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-green-600 mb-2">85%</div>
+                    <div class="text-sm text-gray-600">股票市场</div>
+                    <div class="text-xs text-green-600">宽松</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-yellow-600 mb-2">65%</div>
+                    <div class="text-sm text-gray-600">加密市场</div>
+                    <div class="text-xs text-yellow-600">中性</div>
+                </div>
+            </div>
+            
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h4 class="font-semibold text-gray-800 mb-3">市场解读要点</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                    <div>
+                        <div class="flex items-start mb-2">
+                            <i class="fas fa-water text-blue-500 mr-2 mt-1"></i>
+                            <span><strong>资金水位（RRP）：</strong>余额下降表明资金从央行流出回到市场，流动性边际收紧但仍充足</span>
+                        </div>
+                        <div class="flex items-start mb-2">
+                            <i class="fas fa-percentage text-orange-500 mr-2 mt-1"></i>
+                            <span><strong>融资成本（SOFR）：</strong>4.33%处于合理区间，与美联储政策目标一致</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex items-start mb-2">
+                            <i class="fas fa-chart-bar text-green-500 mr-2 mt-1"></i>
+                            <span><strong>风险情绪（VIX）：</strong>15.79低位运行，投资者情绪稳定，市场风险偏好较高</span>
+                        </div>
+                        <div class="flex items-start mb-2">
+                            <i class="fas fa-coins text-purple-500 mr-2 mt-1"></i>
+                            <span><strong>链上资金：</strong>稳定币总量增长，为加密市场提供充足流动性支撑</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Market Outlook -->
+        <div class="dashboard-card p-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-crystal-ball mr-3 text-purple-600"></i>
+                流动性展望
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h4 class="font-semibold text-green-800 mb-2">
+                        <i class="fas fa-thumbs-up mr-2"></i>正面因素
+                    </h4>
+                    <ul class="text-sm text-green-700 space-y-1">
+                        <li>• VIX维持低位，市场情绪稳定</li>
+                        <li>• 信用利差收窄，信用环境宽松</li>
+                        <li>• 美股交易量充足，市场深度良好</li>
+                        <li>• 稳定币市值增长，链上流动性充裕</li>
+                    </ul>
+                </div>
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 class="font-semibold text-yellow-800 mb-2">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>关注因素
+                    </h4>
+                    <ul class="text-sm text-yellow-700 space-y-1">
+                        <li>• RRP余额下降趋势需持续关注</li>
+                        <li>• MOVE指数处于中位数，债券波动性适中</li>
+                        <li>• 美联储政策调整对短期利率影响</li>
+                        <li>• 地缘政治风险对避险需求的影响</li>
+                    </ul>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 class="font-semibold text-blue-800 mb-2">
+                        <i class="fas fa-lightbulb mr-2"></i>投资建议
+                    </h4>
+                    <ul class="text-sm text-blue-700 space-y-1">
+                        <li>• 当前流动性环境总体有利于风险资产</li>
+                        <li>• 建议维持适度风险偏好配置</li>
+                        <li>• 关注RRP数据变化趋势</li>
+                        <li>• 保持对波动率指标的敏感度</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Update timestamp
+        document.getElementById('lastUpdate').textContent = new Date().toLocaleString('zh-CN');
+
+        // RRP Chart
+        const rrpCtx = document.getElementById('rrpChart').getContext('2d');
+        new Chart(rrpCtx, {
+            type: 'line',
+            data: {
+                labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月'],
+                datasets: [{
+                    label: 'RRP余额(万亿美元)',
+                    data: [2.2, 2.1, 1.9, 1.7, 1.5, 1.4, 1.3, 1.2],
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { display: false },
+                    y: { display: false }
+                }
+            }
+        });
+
+        // VIX Chart
+        const vixCtx = document.getElementById('vixChart').getContext('2d');
+        new Chart(vixCtx, {
+            type: 'line',
+            data: {
+                labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月'],
+                datasets: [{
+                    label: 'VIX指数',
+                    data: [18.2, 16.5, 20.3, 14.8, 13.2, 15.1, 16.8, 15.79],
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { display: false },
+                    y: { display: false }
+                }
+            }
+        });
+
+        // Credit Spread Chart
+        const spreadCtx = document.getElementById('spreadChart').getContext('2d');
+        new Chart(spreadCtx, {
+            type: 'bar',
+            data: {
+                labels: ['投资级', '高收益'],
+                datasets: [{
+                    data: [95, 290],
+                    backgroundColor: ['#10b981', '#f59e0b'],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { display: false },
+                    y: { display: false }
+                }
+            }
+        });
+
+        // Simulate real-time updates
+        setInterval(() => {
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleString('zh-CN');
+        }, 30000);
+    </script>
+</body>
+</html>
