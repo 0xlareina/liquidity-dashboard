@@ -55,6 +55,11 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            transition: all 0.3s ease;
+        }
+        
+        .metric-value.updating {
+            transform: scale(1.05);
         }
         
         .chart-container {
@@ -74,6 +79,33 @@
             transform: rotate(-90deg);
             transform-origin: 50% 50%;
         }
+        
+        .update-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #10b981;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .update-indicator.active {
+            opacity: 1;
+            animation: blink 0.5s ease-in-out;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        .countdown {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
     </style>
 </head>
 <body class="p-4">
@@ -86,7 +118,10 @@
                         <i class="fas fa-tachometer-alt mr-3 text-indigo-600"></i>
                         全球市场流动性监控仪表盘
                     </h1>
-                    <p class="text-gray-600">实时监控全球流动性状况 · 数据更新时间: <span id="lastUpdate" class="font-semibold"></span></p>
+                    <p class="text-gray-600">
+                        实时监控全球流动性状况 · 数据更新时间: <span id="lastUpdate" class="font-semibold"></span>
+                        <span class="ml-4 countdown">下次更新倒计时: <span id="countdown" class="font-mono">60s</span></span>
+                    </p>
                 </div>
                 <div class="text-right">
                     <div class="text-sm text-gray-500 mb-1">流动性状态</div>
@@ -94,6 +129,7 @@
                         <span class="status-indicator status-neutral"></span>
                         中性偏宽松
                     </div>
+                    <div class="update-indicator" id="updateIndicator"></div>
                 </div>
             </div>
         </div>
@@ -125,78 +161,82 @@
         <!-- Main Dashboard Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             <!-- RRP Balance -->
-            <div class="dashboard-card p-6">
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="rrpUpdate"></div>
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-800">美联储RRP余额</h3>
-                    <span class="status-indicator status-neutral"></span>
+                    <span class="status-indicator" id="rrpStatus"></span>
                 </div>
-                <div class="metric-value mb-2">$1.2T</div>
+                <div class="metric-value mb-2" id="rrpValue">$1.2T</div>
                 <div class="text-sm text-gray-600 mb-3">资金"水位"指标</div>
                 <div class="chart-container">
                     <canvas id="rrpChart"></canvas>
                 </div>
-                <div class="text-xs text-gray-500 mt-2">
+                <div class="text-xs text-gray-500 mt-2" id="rrpTrend">
                     <i class="fas fa-arrow-down text-orange-500 mr-1"></i>
                     相比上月下降15%，流动性边际收紧
                 </div>
             </div>
 
             <!-- SOFR Rate -->
-            <div class="dashboard-card p-6">
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="sofrUpdate"></div>
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-800">SOFR利率</h3>
-                    <span class="status-indicator status-neutral"></span>
+                    <span class="status-indicator" id="sofrStatus"></span>
                 </div>
-                <div class="metric-value mb-2">4.33%</div>
+                <div class="metric-value mb-2" id="sofrValue">4.33%</div>
                 <div class="text-sm text-gray-600 mb-3">隔夜资金价格</div>
                 <div class="gauge">
                     <svg class="w-full h-full" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
                         <circle cx="50" cy="50" r="40" stroke="#f59e0b" stroke-width="8" fill="none" 
-                                stroke-dasharray="251" stroke-dashoffset="125" class="progress-ring"/>
-                        <text x="50" y="55" text-anchor="middle" class="text-sm font-bold fill-gray-700">4.33%</text>
+                                stroke-dasharray="251" stroke-dashoffset="125" class="progress-ring" id="sofrGauge"/>
+                        <text x="50" y="55" text-anchor="middle" class="text-sm font-bold fill-gray-700" id="sofrGaugeText">4.33%</text>
                     </svg>
                 </div>
-                <div class="text-xs text-gray-500 mt-2">
+                <div class="text-xs text-gray-500 mt-2" id="sofrTrend">
                     <i class="fas fa-minus text-yellow-500 mr-1"></i>
                     基本稳定，符合政策预期
                 </div>
             </div>
 
             <!-- VIX Index -->
-            <div class="dashboard-card p-6">
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="vixUpdate"></div>
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-800">VIX恐慌指数</h3>
-                    <span class="status-indicator status-loose"></span>
+                    <span class="status-indicator" id="vixStatus"></span>
                 </div>
-                <div class="metric-value mb-2">15.79</div>
+                <div class="metric-value mb-2" id="vixValue">15.79</div>
                 <div class="text-sm text-gray-600 mb-3">市场波动率/恐慌度</div>
                 <div class="chart-container">
                     <canvas id="vixChart"></canvas>
                 </div>
-                <div class="text-xs text-gray-500 mt-2">
+                <div class="text-xs text-gray-500 mt-2" id="vixTrend">
                     <i class="fas fa-arrow-down text-green-500 mr-1"></i>
                     低于20，市场情绪稳定
                 </div>
             </div>
 
             <!-- MOVE Index -->
-            <div class="dashboard-card p-6">
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="moveUpdate"></div>
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-800">MOVE指数</h3>
-                    <span class="status-indicator status-neutral"></span>
+                    <span class="status-indicator" id="moveStatus"></span>
                 </div>
-                <div class="metric-value mb-2">80.75</div>
+                <div class="metric-value mb-2" id="moveValue">80.75</div>
                 <div class="text-sm text-gray-600 mb-3">美债波动率</div>
                 <div class="gauge">
                     <svg class="w-full h-full" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
                         <circle cx="50" cy="50" r="40" stroke="#f59e0b" stroke-width="8" fill="none" 
-                                stroke-dasharray="251" stroke-dashoffset="150" class="progress-ring"/>
-                        <text x="50" y="55" text-anchor="middle" class="text-sm font-bold fill-gray-700">80.75</text>
+                                stroke-dasharray="251" stroke-dashoffset="150" class="progress-ring" id="moveGauge"/>
+                        <text x="50" y="55" text-anchor="middle" class="text-sm font-bold fill-gray-700" id="moveGaugeText">80.75</text>
                     </svg>
                 </div>
-                <div class="text-xs text-gray-500 mt-2">
+                <div class="text-xs text-gray-500 mt-2" id="moveTrend">
                     <i class="fas fa-minus text-yellow-500 mr-1"></i>
                     处于历史中位数附近
                 </div>
@@ -206,7 +246,8 @@
         <!-- Secondary Indicators -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <!-- Credit Spreads -->
-            <div class="dashboard-card p-6">
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="spreadUpdate"></div>
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-800">信用利差</h3>
                     <span class="status-indicator status-loose"></span>
@@ -214,52 +255,54 @@
                 <div class="grid grid-cols-2 gap-4 mb-4">
                     <div>
                         <div class="text-sm text-gray-600">投资级</div>
-                        <div class="text-xl font-bold text-green-600">95bp</div>
+                        <div class="text-xl font-bold text-green-600" id="igSpread">95bp</div>
                     </div>
                     <div>
                         <div class="text-sm text-gray-600">高收益</div>
-                        <div class="text-xl font-bold text-orange-600">290bp</div>
+                        <div class="text-xl font-bold text-orange-600" id="hySpread">290bp</div>
                     </div>
                 </div>
                 <div class="chart-container">
                     <canvas id="spreadChart"></canvas>
                 </div>
-                <div class="text-xs text-gray-500 mt-2">
+                <div class="text-xs text-gray-500 mt-2" id="spreadTrend">
                     <i class="fas fa-arrow-down text-green-500 mr-1"></i>
                     利差收窄，信用环境宽松
                 </div>
             </div>
 
             <!-- Stablecoin Market Cap -->
-            <div class="dashboard-card p-6">
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="stablecoinUpdate"></div>
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-800">稳定币市值</h3>
                     <span class="status-indicator status-neutral"></span>
                 </div>
-                <div class="metric-value mb-2">$278B</div>
+                <div class="metric-value mb-2" id="stablecoinValue">$278B</div>
                 <div class="text-sm text-gray-600 mb-3">链上流动性基础</div>
                 <div class="space-y-2 mb-4">
                     <div class="flex justify-between text-sm">
                         <span>USDT</span>
-                        <span class="font-semibold">$159B (57%)</span>
+                        <span class="font-semibold" id="usdtValue">$159B (57%)</span>
                     </div>
                     <div class="flex justify-between text-sm">
                         <span>USDC</span>
-                        <span class="font-semibold">$63B (23%)</span>
+                        <span class="font-semibold" id="usdcValue">$63B (23%)</span>
                     </div>
                     <div class="flex justify-between text-sm">
                         <span>DAI</span>
-                        <span class="font-semibold">$5.4B (2%)</span>
+                        <span class="font-semibold" id="daiValue">$5.4B (2%)</span>
                     </div>
                 </div>
-                <div class="text-xs text-gray-500">
+                <div class="text-xs text-gray-500" id="stablecoinTrend">
                     <i class="fas fa-arrow-up text-green-500 mr-1"></i>
                     总量增长6%，加密流动性充足
                 </div>
             </div>
 
             <!-- S&P 500 Liquidity -->
-            <div class="dashboard-card p-6">
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="spUpdate"></div>
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-800">美股流动性</h3>
                     <span class="status-indicator status-loose"></span>
@@ -268,19 +311,19 @@
                     <div>
                         <div class="flex justify-between text-sm">
                             <span>日均成交量</span>
-                            <span class="font-semibold">$516B</span>
+                            <span class="font-semibold" id="spVolume">$516B</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
-                            <div class="bg-green-500 h-2 rounded-full" style="width: 85%"></div>
+                            <div class="bg-green-500 h-2 rounded-full" style="width: 85%" id="volumeBar"></div>
                         </div>
                     </div>
                     <div>
                         <div class="flex justify-between text-sm">
                             <span>买卖价差</span>
-                            <span class="font-semibold">0.01%</span>
+                            <span class="font-semibold" id="spSpread">0.01%</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
-                            <div class="bg-green-500 h-2 rounded-full" style="width: 95%"></div>
+                            <div class="bg-green-500 h-2 rounded-full" style="width: 95%" id="spreadBar"></div>
                         </div>
                     </div>
                 </div>
@@ -299,22 +342,22 @@
             </h3>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div class="text-center">
-                    <div class="text-3xl font-bold text-green-600 mb-2">75%</div>
+                    <div class="text-3xl font-bold text-green-600 mb-2" id="moneyMarket">75%</div>
                     <div class="text-sm text-gray-600">货币市场</div>
                     <div class="text-xs text-green-600">宽松</div>
                 </div>
                 <div class="text-center">
-                    <div class="text-3xl font-bold text-yellow-600 mb-2">60%</div>
+                    <div class="text-3xl font-bold text-yellow-600 mb-2" id="bondMarket">60%</div>
                     <div class="text-sm text-gray-600">债券市场</div>
                     <div class="text-xs text-yellow-600">中性</div>
                 </div>
                 <div class="text-center">
-                    <div class="text-3xl font-bold text-green-600 mb-2">85%</div>
+                    <div class="text-3xl font-bold text-green-600 mb-2" id="stockMarket">85%</div>
                     <div class="text-sm text-gray-600">股票市场</div>
                     <div class="text-xs text-green-600">宽松</div>
                 </div>
                 <div class="text-center">
-                    <div class="text-3xl font-bold text-yellow-600 mb-2">65%</div>
+                    <div class="text-3xl font-bold text-yellow-600 mb-2" id="cryptoMarket">65%</div>
                     <div class="text-sm text-gray-600">加密市场</div>
                     <div class="text-xs text-yellow-600">中性</div>
                 </div>
@@ -392,88 +435,91 @@
     </div>
 
     <script>
-        // Update timestamp
-        document.getElementById('lastUpdate').textContent = new Date().toLocaleString('zh-CN');
+        // Global variables for charts and data
+        let rrpChart, vixChart, spreadChart;
+        let countdownTimer = 60;
+        let currentData = {
+            rrp: { value: 1.2, trend: -0.15, status: 'neutral' },
+            sofr: { value: 4.33, trend: 0, status: 'neutral' },
+            vix: { value: 15.79, trend: -0.5, status: 'loose' },
+            move: { value: 80.75, trend: 0, status: 'neutral' },
+            igSpread: { value: 95, trend: -2 },
+            hySpread: { value: 290, trend: -5 },
+            stablecoin: { total: 278, usdt: 159, usdc: 63, dai: 5.4 },
+            spVolume: { value: 516, spread: 0.01 }
+        };
 
-        // RRP Chart
-        const rrpCtx = document.getElementById('rrpChart').getContext('2d');
-        new Chart(rrpCtx, {
-            type: 'line',
-            data: {
-                labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月'],
-                datasets: [{
-                    label: 'RRP余额(万亿美元)',
-                    data: [2.2, 2.1, 1.9, 1.7, 1.5, 1.4, 1.3, 1.2],
-                    borderColor: '#f59e0b',
-                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { display: false },
-                    y: { display: false }
-                }
-            }
-        });
+        // 模拟数据生成函数
+        function generateRealisticData() {
+            // RRP数据 - 通常在1-3T之间波动
+            currentData.rrp.value = Math.max(0.8, currentData.rrp.value + (Math.random() - 0.5) * 0.1);
+            
+            // SOFR利率 - 通常在3-6%之间波动
+            currentData.sofr.value = Math.max(3.0, Math.min(6.0, currentData.sofr.value + (Math.random() - 0.5) * 0.1));
+            
+            // VIX指数 - 通常在10-40之间波动
+            currentData.vix.value = Math.max(10, Math.min(40, currentData.vix.value + (Math.random() - 0.5) * 2));
+            
+            // MOVE指数 - 通常在60-120之间波动
+            currentData.move.value = Math.max(60, Math.min(120, currentData.move.value + (Math.random() - 0.5) * 3));
+            
+            // 信用利差
+            currentData.igSpread.value = Math.max(70, Math.min(150, currentData.igSpread.value + (Math.random() - 0.5) * 5));
+            currentData.hySpread.value = Math.max(200, Math.min(500, currentData.hySpread.value + (Math.random() - 0.5) * 10));
+            
+            // 稳定币市值
+            currentData.stablecoin.total = Math.max(200, currentData.stablecoin.total + (Math.random() - 0.5) * 5);
+            currentData.stablecoin.usdt = currentData.stablecoin.total * 0.57;
+            currentData.stablecoin.usdc = currentData.stablecoin.total * 0.23;
+            
+            // 美股成交量
+            currentData.spVolume.value = Math.max(400, Math.min(800, currentData.spVolume.value + (Math.random() - 0.5) * 20));
+            currentData.spVolume.spread = Math.max(0.005, Math.min(0.02, currentData.spVolume.spread + (Math.random() - 0.5) * 0.002));
+        }
 
-        // VIX Chart
-        const vixCtx = document.getElementById('vixChart').getContext('2d');
-        new Chart(vixCtx, {
-            type: 'line',
-            data: {
-                labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月'],
-                datasets: [{
-                    label: 'VIX指数',
-                    data: [18.2, 16.5, 20.3, 14.8, 13.2, 15.1, 16.8, 15.79],
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { display: false },
-                    y: { display: false }
-                }
-            }
-        });
-
-        // Credit Spread Chart
-        const spreadCtx = document.getElementById('spreadChart').getContext('2d');
-        new Chart(spreadCtx, {
-            type: 'bar',
-            data: {
-                labels: ['投资级', '高收益'],
-                datasets: [{
-                    data: [95, 290],
-                    backgroundColor: ['#10b981', '#f59e0b'],
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { display: false },
-                    y: { display: false }
-                }
-            }
-        });
-
-        // Simulate real-time updates
-        setInterval(() => {
-            document.getElementById('lastUpdate').textContent = new Date().toLocaleString('zh-CN');
-        }, 30000);
-    </script>
-</body>
-</html>
+        // 更新DOM元素
+        function updateDashboard() {
+            // 显示更新指示器
+            document.getElementById('updateIndicator').classList.add('active');
+            document.getElementById('rrpUpdate').classList.add('active');
+            document.getElementById('sofrUpdate').classList.add('active');
+            document.getElementById('vixUpdate').classList.add('active');
+            document.getElementById('moveUpdate').classList.add('active');
+            
+            // 生成新数据
+            generateRealisticData();
+            
+            // 更新RRP
+            const rrpValue = document.getElementById('rrpValue');
+            rrpValue.classList.add('updating');
+            rrpValue.textContent = `$${currentData.rrp.value.toFixed(1)}T`;
+            
+            // 更新SOFR
+            const sofrValue = document.getElementById('sofrValue');
+            const sofrGaugeText = document.getElementById('sofrGaugeText');
+            sofrValue.classList.add('updating');
+            sofrValue.textContent = `${currentData.sofr.value.toFixed(2)}%`;
+            sofrGaugeText.textContent = `${currentData.sofr.value.toFixed(2)}%`;
+            
+            // 更新VIX
+            const vixValue = document.getElementById('vixValue');
+            vixValue.classList.add('updating');
+            vixValue.textContent = currentData.vix.value.toFixed(2);
+            
+            // 更新MOVE
+            const moveValue = document.getElementById('moveValue');
+            const moveGaugeText = document.getElementById('moveGaugeText');
+            moveValue.classList.add('updating');
+            moveValue.textContent = currentData.move.value.toFixed(2);
+            moveGaugeText.textContent = currentData.move.value.toFixed(2);
+            
+            // 更新信用利差
+            document.getElementById('igSpread').textContent = `${Math.round(currentData.igSpread.value)}bp`;
+            document.getElementById('hySpread').textContent = `${Math.round(currentData.hySpread.value)}bp`;
+            
+            // 更新稳定币
+            const stablecoinValue = document.getElementById('stablecoinValue');
+            stablecoinValue.classList.add('updating');
+            stablecoinValue.textContent = `$${Math.round(currentData.stablecoin.total)}B`;
+            document.getElementById('usdtValue').textContent = `$${Math.round(currentData.stablecoin.usdt)}B (57%)`;
+            document.getElementById('usdcValue').textContent = `$${Math.round(currentData.stablecoin.usdc)}B (23%)`;
