@@ -356,6 +356,81 @@
             </div>
         </div>
 
+        <!-- Extended L1: Oil / Curve / Aave / TGA WoW -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="oilUpdate"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">原油价格</h3>
+                    <span class="status-indicator" id="oilStatus"></span>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                        <div class="text-sm text-gray-600">WTI</div>
+                        <div class="text-2xl font-bold text-gray-800" id="wtiValue">—</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-600">Brent</div>
+                        <div class="text-2xl font-bold text-gray-800" id="brentValue">—</div>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500" id="oilTrend">
+                    <i class="fas fa-oil-can text-amber-500 mr-1"></i>Yahoo CL=F / BZ=F
+                </div>
+            </div>
+
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="curveUpdate"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">美债收益率</h3>
+                    <span class="status-indicator" id="curveStatus"></span>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                        <div class="text-sm text-gray-600">2Y</div>
+                        <div class="text-2xl font-bold text-gray-800" id="us2yValue">—</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-600">10Y</div>
+                        <div class="text-2xl font-bold text-gray-800" id="us10yValue">—</div>
+                    </div>
+                </div>
+                <div class="text-sm text-gray-700 mb-1">斜率 10Y−2Y：<span class="font-semibold" id="slopeValue">—</span></div>
+                <div class="text-xs text-gray-500" id="curveTrend">
+                    <i class="fas fa-chart-line text-indigo-500 mr-1"></i>FRED DGS2 / DGS10
+                </div>
+            </div>
+
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="aaveUpdate"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Aave 借贷利率</h3>
+                    <span class="status-indicator" id="aaveStatus"></span>
+                </div>
+                <div class="space-y-2 text-sm mb-3">
+                    <div class="flex justify-between"><span class="text-gray-600">USDT 借/存</span><span class="font-semibold" id="aaveUsdt">—</span></div>
+                    <div class="flex justify-between"><span class="text-gray-600">USDC 借/存</span><span class="font-semibold" id="aaveUsdc">—</span></div>
+                    <div class="flex justify-between"><span class="text-gray-600">混合借款</span><span class="font-semibold" id="aaveBlend">—</span></div>
+                </div>
+                <div class="text-xs text-gray-500" id="aaveTrend">
+                    <i class="fas fa-link text-purple-500 mr-1"></i>Aave v3 Ethereum GraphQL
+                </div>
+            </div>
+
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="tgaWowUpdate"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">TGA 周变化</h3>
+                    <span class="status-indicator" id="tgaWowStatus"></span>
+                </div>
+                <div class="metric-value mb-2" id="tgaWowValue" style="font-size:2rem;">—</div>
+                <div class="text-sm text-gray-600 mb-2">财政部一般账户周度变化速度</div>
+                <div class="text-xs text-gray-500" id="tgaWowTrend">
+                    <i class="fas fa-university text-blue-500 mr-1"></i>FRED WTREGEN · 上升=抽流动性
+                </div>
+            </div>
+        </div>
+
         <!-- Comprehensive Analysis -->
         <div class="dashboard-card p-6 mb-6">
             <h3 class="text-xl font-bold text-gray-800 mb-4">
@@ -473,6 +548,10 @@
             walcl: { valueBn: null, asOf: null },
             tga: { valueBn: null, asOf: null },
             netLiq: { valueTn: null, asOf: null },
+            oil: { wti: null, brent: null },
+            curve: { us2y: null, us10y: null, slopeBp: null, asOf: null },
+            aave: { usdtB: null, usdtS: null, usdcB: null, usdcS: null, blend: null },
+            tgaWowBn: null,
             sourceNotes: []
         };
 
@@ -483,7 +562,9 @@
             IG: 'BAMLC0A0CM',      // OAS percent -> *100 = bp
             HY: 'BAMLH0A0HYM2',
             WALCL: 'WALCL',        // millions USD
-            TGA: 'WTREGEN'         // millions USD (Treasury General Account)
+            TGA: 'WTREGEN',        // millions USD (Treasury General Account)
+            DGS2: 'DGS2',
+            DGS10: 'DGS10'
         };
 
         function apiBase() {
@@ -587,6 +668,55 @@
             if (el) el.innerHTML = html;
         }
 
+
+        async function fetchAaveRates() {
+            const POOL = '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2';
+            const query = `query ($req: MarketRequest!) {
+              market(request: $req) {
+                reserves {
+                  underlyingToken { symbol }
+                  supplyInfo { apy { formatted } }
+                  borrowInfo { apy { formatted } }
+                }
+              }
+            }`;
+            const r = await fetch('https://api.v3.aave.com/graphql', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json', origin: 'https://app.aave.com', referer: 'https://app.aave.com/' },
+                body: JSON.stringify({ query, variables: { req: { address: POOL, chainId: 1 } } })
+            });
+            if (!r.ok) throw new Error('aave http ' + r.status);
+            const j = await r.json();
+            if (j.errors && j.errors.length) throw new Error(j.errors[0].message || 'aave gql');
+            const out = { usdtB: null, usdtS: null, usdcB: null, usdcS: null, blend: null };
+            for (const row of (j.data && j.data.market && j.data.market.reserves) || []) {
+                const sym = String((row.underlyingToken && row.underlyingToken.symbol) || '').toUpperCase();
+                if (sym !== 'USDT' && sym !== 'USDC') continue;
+                const s = parseFloat(row.supplyInfo && row.supplyInfo.apy && row.supplyInfo.apy.formatted);
+                const b = parseFloat(row.borrowInfo && row.borrowInfo.apy && row.borrowInfo.apy.formatted);
+                if (sym === 'USDT') { out.usdtS = s; out.usdtB = b; }
+                if (sym === 'USDC') { out.usdcS = s; out.usdcB = b; }
+            }
+            const borrows = [out.usdtB, out.usdcB].filter(x => Number.isFinite(x));
+            out.blend = borrows.length ? borrows.reduce((a,b)=>a+b,0)/borrows.length : null;
+            return out;
+        }
+
+        function tgaWowFromObs(obs) {
+            if (!obs || !obs.length) return null;
+            const latest = obs[obs.length - 1];
+            const ld = new Date(latest.date + 'T00:00:00Z');
+            const target = new Date(ld.getTime() - 7 * 86400000);
+            let best = null;
+            for (const o of obs) {
+                const d = new Date(o.date + 'T00:00:00Z');
+                if (d <= target) best = o;
+            }
+            if (!best && obs.length >= 2) best = obs[obs.length - 2];
+            if (!best) return null;
+            return Math.round(((latest.value - best.value) / 1000) * 10) / 10;
+        }
+
         async function loadLiveData() {
             const notes = [];
             const tasks = {
@@ -599,7 +729,12 @@
                 tga: fetchFredSeries(SERIES.TGA, 30).catch(e => { notes.push('TGA: ' + e.message); return null; }),
                 move: fetchYahoo('^MOVE').catch(e => { notes.push('MOVE: ' + e.message); return null; }),
                 spy: fetchYahoo('SPY', '5d').catch(e => { notes.push('SPY: ' + e.message); return null; }),
-                stables: fetchStablecoinData().catch(e => { notes.push('Stablecoins: ' + e.message); return null; })
+                stables: fetchStablecoinData().catch(e => { notes.push('Stablecoins: ' + e.message); return null; }),
+                wti: fetchYahoo('CL=F', '5d').catch(e => { notes.push('WTI: ' + e.message); return null; }),
+                brent: fetchYahoo('BZ=F', '5d').catch(e => { notes.push('Brent: ' + e.message); return null; }),
+                dgs2: fetchFredSeries(SERIES.DGS2, 30).catch(e => { notes.push('DGS2: ' + e.message); return null; }),
+                dgs10: fetchFredSeries(SERIES.DGS10, 30).catch(e => { notes.push('DGS10: ' + e.message); return null; }),
+                aave: fetchAaveRates().catch(e => { notes.push('Aave: ' + e.message); return null; })
             };
 
             const results = {};
@@ -649,6 +784,23 @@
             if (results.stables) {
                 currentData.stablecoin = results.stables;
             }
+            if (results.wti && results.wti.price != null) currentData.oil.wti = results.wti.price;
+            if (results.brent && results.brent.price != null) currentData.oil.brent = results.brent.price;
+            if (results.dgs2) {
+                currentData.curve.us2y = results.dgs2.latest.value;
+                currentData.curve.asOf = results.dgs2.latest.date;
+            }
+            if (results.dgs10) {
+                currentData.curve.us10y = results.dgs10.latest.value;
+                currentData.curve.asOf = results.dgs10.latest.date;
+            }
+            if (currentData.curve.us2y != null && currentData.curve.us10y != null) {
+                currentData.curve.slopeBp = Math.round((currentData.curve.us10y - currentData.curve.us2y) * 100);
+            }
+            if (results.aave) currentData.aave = results.aave;
+            if (results.tga && results.tga.observations) {
+                currentData.tgaWowBn = tgaWowFromObs(results.tga.observations);
+            }
 
             // Net liquidity = WALCL - TGA - RRP (all in billions) -> display in trillions
             if (currentData.walcl.valueBn != null && currentData.tga.valueBn != null && currentData.rrp.value != null) {
@@ -665,7 +817,7 @@
 
         function updateDashboard() {
             document.getElementById('updateIndicator').classList.add('active');
-            ['rrpUpdate','sofrUpdate','vixUpdate','moveUpdate','netLiqUpdate','spreadUpdate','stablecoinUpdate','spUpdate']
+            ['rrpUpdate','sofrUpdate','vixUpdate','moveUpdate','netLiqUpdate','spreadUpdate','stablecoinUpdate','spUpdate','oilUpdate','curveUpdate','aaveUpdate','tgaWowUpdate']
                 .forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('active'); });
 
             // RRP (billions)
@@ -757,6 +909,38 @@
             }
             setText('walclValue', fmtMoneyBn(currentData.walcl.valueBn, 0));
             setText('tgaValue', fmtMoneyBn(currentData.tga.valueBn, 0));
+
+            // Oil / Curve / Aave / TGA WoW
+            setText('wtiValue', currentData.oil.wti != null ? '$' + currentData.oil.wti.toFixed(2) : '—');
+            setText('brentValue', currentData.oil.brent != null ? '$' + currentData.oil.brent.toFixed(2) : '—');
+            setHtml('oilTrend', currentData.oil.wti != null
+                ? '<i class="fas fa-oil-can text-amber-500 mr-1"></i>Yahoo CL=F / BZ=F'
+                : '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>油价暂无数据');
+            setText('us2yValue', fmtPct(currentData.curve.us2y));
+            setText('us10yValue', fmtPct(currentData.curve.us10y));
+            setText('slopeValue', currentData.curve.slopeBp != null ? currentData.curve.slopeBp + 'bp' : '—');
+            setHtml('curveTrend', currentData.curve.asOf
+                ? '<i class="fas fa-calendar text-indigo-500 mr-1"></i>FRED DGS2/DGS10 · 截至 ' + currentData.curve.asOf
+                : '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>收益率暂无数据');
+            const fmtAB = (b, s) => (Number.isFinite(b) || Number.isFinite(s))
+                ? ((Number.isFinite(b) ? b.toFixed(2) : '—') + '% / ' + (Number.isFinite(s) ? s.toFixed(2) : '—') + '%')
+                : '—';
+            setText('aaveUsdt', fmtAB(currentData.aave.usdtB, currentData.aave.usdtS));
+            setText('aaveUsdc', fmtAB(currentData.aave.usdcB, currentData.aave.usdcS));
+            setText('aaveBlend', currentData.aave.blend != null ? currentData.aave.blend.toFixed(2) + '%' : '—');
+            setHtml('aaveTrend', currentData.aave.blend != null
+                ? '<i class="fas fa-link text-purple-500 mr-1"></i>Aave v3 Ethereum · 借/存 APY'
+                : '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>Aave 暂无数据');
+            const tw = currentData.tgaWowBn;
+            const twEl = document.getElementById('tgaWowValue');
+            if (twEl) {
+                twEl.classList.add('updating');
+                twEl.textContent = tw != null ? ((tw > 0 ? '+' : '') + '$' + tw.toFixed(1) + 'B') : '—';
+            }
+            setHtml('tgaWowTrend', tw != null
+                ? '<i class="fas fa-university text-blue-500 mr-1"></i>FRED WTREGEN 周变化 · ' + (tw > 0 ? '抽流动性' : '回补流动性')
+                : '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>TGA WoW 暂无数据');
+
             setHtml('netLiqTrend', currentData.netLiq.valueTn != null
                 ? `<i class="fas fa-check text-green-500 mr-1"></i>WALCL − TGA − RRP（十亿美元口径）`
                 : `<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>缺少 WALCL/TGA/RRP 之一`);
