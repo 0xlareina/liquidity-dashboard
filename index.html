@@ -107,6 +107,40 @@
             font-size: 0.75rem;
             color: #6b7280;
         }
+
+        .timeline-wrap {
+            position: relative;
+            height: 340px;
+            width: 100%;
+        }
+        .corr-cell {
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            padding: 10px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .series-toggle {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid #d1d5db;
+            background: #fff;
+            color: #374151;
+            cursor: pointer;
+        }
+        .series-toggle.on {
+            border-color: transparent;
+            color: #111827;
+            font-weight: 600;
+            box-shadow: inset 0 -3px 0 var(--c, #6366f1);
+            background: #f8fafc;
+        }
+        .series-toggle.off {
+            opacity: 0.45;
+        }
     </style>
 </head>
 <body class="p-4">
@@ -119,6 +153,7 @@
                         <i class="fas fa-tachometer-alt mr-3 text-indigo-600"></i>
                         全球市场流动性监控仪表盘
                     </h1>
+                    <p class="text-sm mb-1"><a href="/macro/" class="text-indigo-700 underline font-medium">打开 Macro 驾驶舱（统一时间轴 / 相关 / L1–L3）→</a></p>
                     <p class="text-gray-600">
                         实时监控全球流动性状况 · 数据更新时间: <span id="lastUpdate" class="font-semibold"></span>
                         <span class="ml-4 countdown">下次更新倒计时: <span id="countdown" class="font-mono">300s</span></span>
@@ -472,6 +507,33 @@
             </div>
         </div>
 
+
+        <!-- Shared Timeline + Correlation (main view, not buried) -->
+        <div class="dashboard-card p-6 mb-6" id="timelineSection">
+            <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-2 mb-4">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-stream mr-3 text-indigo-600"></i>
+                        统一时间轴 · 流动性相关序列
+                    </h3>
+                    <p class="text-sm text-gray-600 mt-1" id="timelineMeta">加载 FRED / CoinGecko 历史序列…</p>
+                </div>
+                <div class="text-xs text-gray-500">各序列按自身 min/max 归一化 · 共用横轴 · 非因果</div>
+            </div>
+            <div class="flex flex-wrap gap-2 mb-3" id="timelineToggles"></div>
+            <div class="timeline-wrap mb-4">
+                <canvas id="sharedTimelineChart"></canvas>
+            </div>
+            <div class="border-t border-gray-100 pt-4">
+                <h4 class="font-semibold text-gray-800 mb-2">
+                    <i class="fas fa-project-diagram mr-2 text-purple-600"></i>
+                    正负相关（Pearson · as-of 对齐）
+                </h4>
+                <p class="text-xs text-gray-500 mb-3" id="corrMeta">等待足够重叠样本（n≥8）</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="corrMatrix"></div>
+            </div>
+        </div>
+
         <!-- Comprehensive Analysis -->
         <div class="dashboard-card p-6 mb-6">
             <h3 class="text-xl font-bold text-gray-800 mb-4">
@@ -816,13 +878,13 @@
         async function loadLiveData() {
             const notes = [];
             const tasks = {
-                rrp: fetchFredSeries(SERIES.RRP, 90).catch(e => { notes.push('RRP: ' + e.message); return null; }),
+                rrp: fetchFredSeries(SERIES.RRP, 200).catch(e => { notes.push('RRP: ' + e.message); return null; }),
                 sofr: fetchFredSeries(SERIES.SOFR, 30).catch(e => { notes.push('SOFR: ' + e.message); return null; }),
-                vix: fetchFredSeries(SERIES.VIX, 90).catch(e => { notes.push('VIX: ' + e.message); return null; }),
+                vix: fetchFredSeries(SERIES.VIX, 200).catch(e => { notes.push('VIX: ' + e.message); return null; }),
                 ig: fetchFredSeries(SERIES.IG, 30).catch(e => { notes.push('IG: ' + e.message); return null; }),
-                hy: fetchFredSeries(SERIES.HY, 30).catch(e => { notes.push('HY: ' + e.message); return null; }),
-                walcl: fetchFredSeries(SERIES.WALCL, 30).catch(e => { notes.push('WALCL: ' + e.message); return null; }),
-                tga: fetchFredSeries(SERIES.TGA, 30).catch(e => { notes.push('TGA: ' + e.message); return null; }),
+                hy: fetchFredSeries(SERIES.HY, 200).catch(e => { notes.push('HY: ' + e.message); return null; }),
+                walcl: fetchFredSeries(SERIES.WALCL, 120).catch(e => { notes.push('WALCL: ' + e.message); return null; }),
+                tga: fetchFredSeries(SERIES.TGA, 200).catch(e => { notes.push('TGA: ' + e.message); return null; }),
                 move: fetchYahoo('^MOVE').catch(e => { notes.push('MOVE: ' + e.message); return null; }),
                 spy: fetchYahoo('SPY', '5d').catch(e => { notes.push('SPY: ' + e.message); return null; }),
                 stables: fetchStablecoinData().catch(e => { notes.push('Stablecoins: ' + e.message); return null; }),
@@ -833,11 +895,22 @@
                 aave: fetchAaveRates().catch(e => { notes.push('Aave: ' + e.message); return null; }),
                 etf: fetchEtfFlows().catch(e => { notes.push('ETF: ' + e.message); return null; }),
                 liq: fetchLiq24h().catch(e => { notes.push('Liq: ' + e.message); return null; }),
-                stableDelta: fetchStableCircDelta().catch(e => { notes.push('StableΔ: ' + e.message); return null; })
+                stableDelta: fetchStableCircDelta().catch(e => { notes.push('StableΔ: ' + e.message); return null; }),
+                btcHist: fetchBtcHistory().catch(e => { notes.push('BTC hist: ' + e.message); return null; })
             };
 
             const results = {};
             await Promise.all(Object.keys(tasks).map(async k => { results[k] = await tasks[k]; }));
+
+            // Keep full observation rows for shared timeline
+            currentData._hist = {
+                walcl: results.walcl && results.walcl.observations ? results.walcl.observations : [],
+                tga: results.tga && results.tga.observations ? results.tga.observations : [],
+                rrp: results.rrp && results.rrp.observations ? results.rrp.observations : [],
+                vix: results.vix && results.vix.observations ? results.vix.observations : [],
+                hy: results.hy && results.hy.observations ? results.hy.observations : []
+            };
+            currentData._btcHist = results.btcHist || [];
 
             if (results.rrp) {
                 currentData.rrp.value = results.rrp.latest.value; // billions
@@ -1070,6 +1143,7 @@
 
             updateStatusIndicators();
             updateCharts();
+            updateSharedTimeline();
             updateInsights();
             updateCompositeScores();
 
@@ -1227,6 +1301,231 @@
                 countdownTimer = REFRESH_SECONDS;
             }
         }
+
+
+        let sharedTimelineChart = null;
+        const SERIES_META = {
+            netLiq: { label: '净流动性', color: '#6366f1', unit: 'Tn' },
+            rrp: { label: 'RRP', color: '#a78bfa', unit: 'Bn' },
+            vix: { label: 'VIX', color: '#f472b6', unit: 'idx' },
+            hy: { label: 'HY OAS', color: '#fb7185', unit: '%' },
+            btc: { label: 'BTC', color: '#f59e0b', unit: 'USD' }
+        };
+        let timelineEnabled = { netLiq: true, rrp: false, vix: true, hy: false, btc: true };
+
+        async function fetchBtcHistory() {
+            const r = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=180');
+            if (!r.ok) throw new Error('coingecko http ' + r.status);
+            const j = await r.json();
+            return (j.prices || []).map(([t, v]) => ({ t: Number(t), v: Number(v) })).filter(p => Number.isFinite(p.t) && Number.isFinite(p.v));
+        }
+
+        function dateToMs(ymd) {
+            return Date.parse(ymd + 'T12:00:00Z');
+        }
+
+        function buildNetLiqPoints(walcl, tga, rrp) {
+            if (!walcl.length || !tga.length || !rrp.length) return [];
+            const tgaPts = tga.map(o => ({ t: dateToMs(o.date), v: o.value / 1000 })); // bn
+            const rrpPts = rrp.map(o => ({ t: dateToMs(o.date), v: o.value }));
+            tgaPts.sort((a,b)=>a.t-b.t); rrpPts.sort((a,b)=>a.t-b.t);
+            const wal = [...walcl].sort((a,b)=>a.date.localeCompare(b.date));
+            let it=0, ir=0; const out=[];
+            for (const w of wal) {
+                const t = dateToMs(w.date);
+                const walclBn = w.value / 1000;
+                while (it+1 < tgaPts.length && tgaPts[it+1].t <= t) it++;
+                while (ir+1 < rrpPts.length && rrpPts[ir+1].t <= t) ir++;
+                if (!tgaPts.length || !rrpPts.length) continue;
+                if (tgaPts[it].t > t || rrpPts[ir].t > t) continue;
+                const netTn = (walclBn - tgaPts[it].v - rrpPts[ir].v) / 1000;
+                if (Number.isFinite(netTn)) out.push({ t, v: netTn });
+            }
+            return out;
+        }
+
+        function obsToPoints(obs, scale=1) {
+            return (obs||[]).map(o => ({ t: dateToMs(o.date), v: Number(o.value)*scale })).filter(p => Number.isFinite(p.t)&&Number.isFinite(p.v));
+        }
+
+        function normalize(points) {
+            if (!points.length) return [];
+            let lo=Infinity, hi=-Infinity;
+            for (const p of points) { if (p.v<lo) lo=p.v; if (p.v>hi) hi=p.v; }
+            const span = hi-lo || 1;
+            return points.map(p => ({ t:p.t, y:(p.v-lo)/span, v:p.v }));
+        }
+
+        function asOfJoin(base, other) {
+            if (!base.length || !other.length) return [];
+            const sortedO = [...other].sort((x,y)=>x.t-y.t);
+            let j=0; const out=[];
+            for (const p of [...base].sort((x,y)=>x.t-y.t)) {
+                while (j+1 < sortedO.length && sortedO[j+1].t <= p.t) j++;
+                if (sortedO[j].t <= p.t) out.push({ a:p.v, b:sortedO[j].v });
+            }
+            return out;
+        }
+
+        function pearson(pairs) {
+            const n = pairs.length;
+            if (n < 8) return null;
+            let sa=0,sb=0,saa=0,sbb=0,sab=0;
+            for (const p of pairs) { sa+=p.a; sb+=p.b; saa+=p.a*p.a; sbb+=p.b*p.b; sab+=p.a*p.b; }
+            const num = n*sab - sa*sb;
+            const den = Math.sqrt((n*saa-sa*sa)*(n*sbb-sb*sb));
+            if (!Number.isFinite(den) || den===0) return null;
+            return { r: num/den, n };
+        }
+
+        function ensureTimelineChart() {
+            const canvas = document.getElementById('sharedTimelineChart');
+            if (!canvas) return null;
+            if (sharedTimelineChart) return sharedTimelineChart;
+            sharedTimelineChart = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: { datasets: [] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => {
+                                    if (!items.length) return '';
+                                    const t = items[0].parsed.x;
+                                    return new Date(t).toISOString().slice(0,10);
+                                },
+                                label: (ctx) => {
+                                    const raw = ctx.raw;
+                                    const meta = SERIES_META[ctx.dataset.id] || {};
+                                    const v = raw && raw.v != null ? raw.v : ctx.parsed.y;
+                                    let vs = typeof v === 'number' ? v.toFixed(meta.unit==='Tn'?2:meta.unit==='USD'?0:2) : v;
+                                    return `${ctx.dataset.label}: ${vs} ${meta.unit||''}`.trim();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            ticks: {
+                                callback: (v) => {
+                                    const d = new Date(v);
+                                    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+                                },
+                                maxTicksLimit: 8
+                            },
+                            grid: { color: 'rgba(148,163,184,0.15)' }
+                        },
+                        y: {
+                            min: 0, max: 1,
+                            ticks: { callback: (v) => (v===1?'hi':v===0?'lo':'') },
+                            grid: { color: 'rgba(148,163,184,0.12)' },
+                            title: { display: true, text: '归一化', font: { size: 11 } }
+                        }
+                    },
+                    animation: { duration: 250 }
+                }
+            });
+            return sharedTimelineChart;
+        }
+
+        function renderTimelineToggles(seriesMap) {
+            const box = document.getElementById('timelineToggles');
+            if (!box) return;
+            box.innerHTML = '';
+            Object.keys(SERIES_META).forEach(id => {
+                if (!seriesMap[id] || !seriesMap[id].length) return;
+                const meta = SERIES_META[id];
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                const on = timelineEnabled[id] !== false;
+                btn.className = 'series-toggle ' + (on ? 'on' : 'off');
+                btn.style.setProperty('--c', meta.color);
+                btn.textContent = `${meta.label} · ${meta.unit}`;
+                btn.onclick = () => {
+                    timelineEnabled[id] = !(timelineEnabled[id] !== false);
+                    updateSharedTimeline();
+                };
+                box.appendChild(btn);
+            });
+        }
+
+        function updateSharedTimeline() {
+            const hist = currentData._hist || {};
+            const seriesMap = {
+                netLiq: buildNetLiqPoints(hist.walcl||[], hist.tga||[], hist.rrp||[]),
+                rrp: obsToPoints(hist.rrp||[]),
+                vix: obsToPoints(hist.vix||[]),
+                hy: obsToPoints(hist.hy||[]),
+                btc: currentData._btcHist || []
+            };
+            renderTimelineToggles(seriesMap);
+            const chart = ensureTimelineChart();
+            if (!chart) return;
+
+            const datasets = [];
+            Object.keys(SERIES_META).forEach(id => {
+                if (timelineEnabled[id] === false) return;
+                const pts = seriesMap[id] || [];
+                if (!pts.length) return;
+                const norm = normalize(pts);
+                const meta = SERIES_META[id];
+                datasets.push({
+                    id,
+                    label: meta.label,
+                    data: norm.map(p => ({ x: p.t, y: p.y, v: p.v })),
+                    borderColor: meta.color,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.15,
+                    spanGaps: false
+                });
+            });
+            chart.data.datasets = datasets;
+            chart.update('none');
+
+            const nNet = seriesMap.netLiq.length;
+            const nBtc = seriesMap.btc.length;
+            const metaEl = document.getElementById('timelineMeta');
+            if (metaEl) {
+                if (!datasets.length) metaEl.textContent = '暂无可用历史点 — 检查 /api/fred 或 CoinGecko';
+                else metaEl.textContent = `FRED 净流动性约 ${nNet} 周点 · BTC ${nBtc} 日 · 勾选切换序列`;
+            }
+
+            // Correlations
+            const pairsSpec = [
+                ['netLiq','btc'],['netLiq','vix'],['netLiq','hy'],['netLiq','rrp'],
+                ['btc','vix'],['btc','hy'],['btc','rrp'],['vix','hy']
+            ];
+            const corrs = [];
+            for (const [a,b] of pairsSpec) {
+                if (!seriesMap[a]?.length || !seriesMap[b]?.length) continue;
+                const base = seriesMap[a].length <= seriesMap[b].length ? seriesMap[a] : seriesMap[b];
+                const other = base === seriesMap[a] ? seriesMap[b] : seriesMap[a];
+                const joined = asOfJoin(base, other);
+                const pr = pearson(joined);
+                if (pr) corrs.push({ a: SERIES_META[a].label, b: SERIES_META[b].label, r: Math.round(pr.r*1000)/1000, n: pr.n });
+            }
+            corrs.sort((x,y)=>Math.abs(y.r)-Math.abs(x.r));
+            const corrBox = document.getElementById('corrMatrix');
+            const corrMeta = document.getElementById('corrMeta');
+            if (corrMeta) corrMeta.textContent = corrs.length ? `按较低频序列 as-of 对齐 · 显示 |r| 最大的 ${Math.min(8,corrs.length)} 对` : '重叠样本不足（需 n≥8）';
+            if (corrBox) {
+                corrBox.innerHTML = corrs.slice(0,8).map(p => {
+                    const pos = p.r >= 0;
+                    const bg = pos ? `rgba(16,185,129,${0.12+Math.min(Math.abs(p.r),1)*0.35})` : `rgba(244,63,94,${0.12+Math.min(Math.abs(p.r),1)*0.35})`;
+                    const col = pos ? 'text-green-700' : 'text-rose-700';
+                    const sign = pos ? '+' : '';
+                    return `<div class="corr-cell" style="background:${bg}"><div class="text-sm text-gray-800">${p.a} <span class="text-gray-400">×</span> ${p.b}</div><div class="font-mono text-sm ${col} font-bold">${sign}${p.r.toFixed(3)} <span class="text-xs text-gray-500 font-normal">n=${p.n}</span></div></div>`;
+                }).join('') || '<div class="text-sm text-gray-500 py-4 text-center">尚无相关结果</div>';
+            }
+        }
+
 
         function initializeCharts() {
             const rrpCtx = document.getElementById('rrpChart').getContext('2d');

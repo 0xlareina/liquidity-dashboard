@@ -2,6 +2,12 @@
 
 部署：[liquidity-dashboard-six.vercel.app](https://liquidity-dashboard-six.vercel.app)
 
+## 统一时间轴 / 相关性
+
+主页「统一时间轴 · 流动性相关序列」展示 Net Liq / RRP / VIX / HY / BTC（归一化共用横轴）与 Pearson 相关矩阵。
+
+Macro 驾驶舱静态构建镜像：[/macro/](https://liquidity-dashboard-six.vercel.app/macro/)（源码仍在私有 `Macro-Dashboard`）。
+
 ## 数据源（真实序列，非 mock）
 
 | 指标 | 来源 | 说明 |
