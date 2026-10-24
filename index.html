@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>全球市场流动性监控仪表盘</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -167,14 +168,14 @@
                     <h3 class="text-lg font-semibold text-gray-800">美联储RRP余额</h3>
                     <span class="status-indicator" id="rrpStatus"></span>
                 </div>
-                <div class="metric-value mb-2" id="rrpValue">$1.2T</div>
+                <div class="metric-value mb-2" id="rrpValue">—</div>
                 <div class="text-sm text-gray-600 mb-3">资金"水位"指标</div>
                 <div class="chart-container">
                     <canvas id="rrpChart"></canvas>
                 </div>
                 <div class="text-xs text-gray-500 mt-2" id="rrpTrend">
                     <i class="fas fa-arrow-down text-orange-500 mr-1"></i>
-                    相比上月下降15%，流动性边际收紧
+                    加载中…
                 </div>
             </div>
 
@@ -185,19 +186,19 @@
                     <h3 class="text-lg font-semibold text-gray-800">SOFR利率</h3>
                     <span class="status-indicator" id="sofrStatus"></span>
                 </div>
-                <div class="metric-value mb-2" id="sofrValue">4.33%</div>
+                <div class="metric-value mb-2" id="sofrValue">—</div>
                 <div class="text-sm text-gray-600 mb-3">隔夜资金价格</div>
                 <div class="gauge">
                     <svg class="w-full h-full" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
                         <circle cx="50" cy="50" r="40" stroke="#f59e0b" stroke-width="8" fill="none" 
                                 stroke-dasharray="251" stroke-dashoffset="125" class="progress-ring" id="sofrGauge"/>
-                        <text x="50" y="55" text-anchor="middle" class="text-sm font-bold fill-gray-700" id="sofrGaugeText">4.33%</text>
+                        <text x="50" y="55" text-anchor="middle" class="text-sm font-bold fill-gray-700" id="sofrGaugeText">—</text>
                     </svg>
                 </div>
                 <div class="text-xs text-gray-500 mt-2" id="sofrTrend">
                     <i class="fas fa-minus text-yellow-500 mr-1"></i>
-                    基本稳定，符合政策预期
+                    加载中…
                 </div>
             </div>
 
@@ -208,14 +209,14 @@
                     <h3 class="text-lg font-semibold text-gray-800">VIX恐慌指数</h3>
                     <span class="status-indicator" id="vixStatus"></span>
                 </div>
-                <div class="metric-value mb-2" id="vixValue">15.79</div>
+                <div class="metric-value mb-2" id="vixValue">—</div>
                 <div class="text-sm text-gray-600 mb-3">市场波动率/恐慌度</div>
                 <div class="chart-container">
                     <canvas id="vixChart"></canvas>
                 </div>
                 <div class="text-xs text-gray-500 mt-2" id="vixTrend">
                     <i class="fas fa-arrow-down text-green-500 mr-1"></i>
-                    低于20，市场情绪稳定
+                    加载中…
                 </div>
             </div>
 
@@ -226,19 +227,19 @@
                     <h3 class="text-lg font-semibold text-gray-800">MOVE指数</h3>
                     <span class="status-indicator" id="moveStatus"></span>
                 </div>
-                <div class="metric-value mb-2" id="moveValue">80.75</div>
+                <div class="metric-value mb-2" id="moveValue">—</div>
                 <div class="text-sm text-gray-600 mb-3">美债波动率</div>
                 <div class="gauge">
                     <svg class="w-full h-full" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
                         <circle cx="50" cy="50" r="40" stroke="#f59e0b" stroke-width="8" fill="none" 
                                 stroke-dasharray="251" stroke-dashoffset="150" class="progress-ring" id="moveGauge"/>
-                        <text x="50" y="55" text-anchor="middle" class="text-sm font-bold fill-gray-700" id="moveGaugeText">80.75</text>
+                        <text x="50" y="55" text-anchor="middle" class="text-sm font-bold fill-gray-700" id="moveGaugeText">—</text>
                     </svg>
                 </div>
                 <div class="text-xs text-gray-500 mt-2" id="moveTrend">
                     <i class="fas fa-minus text-yellow-500 mr-1"></i>
-                    处于历史中位数附近
+                    加载中…
                 </div>
             </div>
         </div>
@@ -363,22 +364,22 @@
             </h3>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div class="text-center">
-                    <div class="text-3xl font-bold text-green-600 mb-2" id="moneyMarket">75%</div>
+                    <div class="text-3xl font-bold text-green-600 mb-2" id="moneyMarket">—</div>
                     <div class="text-sm text-gray-600">货币市场</div>
                     <div class="text-xs text-green-600">宽松</div>
                 </div>
                 <div class="text-center">
-                    <div class="text-3xl font-bold text-yellow-600 mb-2" id="bondMarket">60%</div>
+                    <div class="text-3xl font-bold text-yellow-600 mb-2" id="bondMarket">—</div>
                     <div class="text-sm text-gray-600">债券市场</div>
                     <div class="text-xs text-yellow-600">中性</div>
                 </div>
                 <div class="text-center">
-                    <div class="text-3xl font-bold text-green-600 mb-2" id="stockMarket">85%</div>
+                    <div class="text-3xl font-bold text-green-600 mb-2" id="stockMarket">—</div>
                     <div class="text-sm text-gray-600">股票市场</div>
                     <div class="text-xs text-green-600">宽松</div>
                 </div>
                 <div class="text-center">
-                    <div class="text-3xl font-bold text-yellow-600 mb-2" id="cryptoMarket">65%</div>
+                    <div class="text-3xl font-bold text-yellow-600 mb-2" id="cryptoMarket">—</div>
                     <div class="text-sm text-gray-600">加密市场</div>
                     <div class="text-xs text-yellow-600">中性</div>
                 </div>
@@ -669,8 +670,10 @@
 
             // RRP (billions)
             const rrpValue = document.getElementById('rrpValue');
-            rrpValue.classList.add('updating');
-            rrpValue.textContent = fmtMoneyBn(currentData.rrp.value, 2);
+            if (rrpValue) {
+                rrpValue.classList.add('updating');
+                rrpValue.textContent = fmtMoneyBn(currentData.rrp.value, 2);
+            }
             setHtml('rrpTrend', currentData.rrp.asOf
                 ? `<i class="fas fa-calendar text-blue-500 mr-1"></i>FRED RRPONTSYD · 截至 ${currentData.rrp.asOf}`
                 : `<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>RRP 暂无数据`);
@@ -679,17 +682,21 @@
             // SOFR
             const sofrValue = document.getElementById('sofrValue');
             const sofrGaugeText = document.getElementById('sofrGaugeText');
-            sofrValue.classList.add('updating');
-            sofrValue.textContent = fmtPct(currentData.sofr.value);
-            sofrGaugeText.textContent = fmtPct(currentData.sofr.value);
+            if (sofrValue) {
+                sofrValue.classList.add('updating');
+                sofrValue.textContent = fmtPct(currentData.sofr.value);
+            }
+            if (sofrGaugeText) sofrGaugeText.textContent = fmtPct(currentData.sofr.value);
             setHtml('sofrTrend', currentData.sofr.asOf
                 ? `<i class="fas fa-calendar text-blue-500 mr-1"></i>FRED SOFR · 截至 ${currentData.sofr.asOf}`
                 : `<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>SOFR 暂无数据`);
 
             // VIX
             const vixValue = document.getElementById('vixValue');
-            vixValue.classList.add('updating');
-            vixValue.textContent = currentData.vix.value != null ? currentData.vix.value.toFixed(2) : '—';
+            if (vixValue) {
+                vixValue.classList.add('updating');
+                vixValue.textContent = currentData.vix.value != null ? currentData.vix.value.toFixed(2) : '—';
+            }
             setHtml('vixTrend', currentData.vix.asOf
                 ? `<i class="fas fa-calendar text-blue-500 mr-1"></i>FRED VIXCLS · 截至 ${currentData.vix.asOf}`
                 : `<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>VIX 暂无数据`);
@@ -697,9 +704,13 @@
             // MOVE
             const moveValue = document.getElementById('moveValue');
             const moveGaugeText = document.getElementById('moveGaugeText');
-            moveValue.classList.add('updating');
-            moveValue.textContent = currentData.move.value != null ? currentData.move.value.toFixed(2) : '—';
-            moveGaugeText.textContent = currentData.move.value != null ? currentData.move.value.toFixed(2) : '—';
+            if (moveValue) {
+                moveValue.classList.add('updating');
+                moveValue.textContent = currentData.move.value != null ? currentData.move.value.toFixed(2) : '—';
+            }
+            if (moveGaugeText) {
+                moveGaugeText.textContent = currentData.move.value != null ? currentData.move.value.toFixed(2) : '—';
+            }
             setHtml('moveTrend', currentData.move.value != null
                 ? `<i class="fas fa-chart-line text-blue-500 mr-1"></i>Yahoo ^MOVE`
                 : `<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>MOVE 暂无数据`);
@@ -713,17 +724,17 @@
 
             // Stablecoins
             const stablecoinValue = document.getElementById('stablecoinValue');
-            stablecoinValue.classList.add('updating');
+            if (stablecoinValue) stablecoinValue.classList.add('updating');
             if (currentData.stablecoin.total != null) {
                 const t = currentData.stablecoin.total;
-                stablecoinValue.textContent = `$${Math.round(t)}B`;
+                if (stablecoinValue) stablecoinValue.textContent = `$${Math.round(t)}B`;
                 const pct = (x) => t > 0 ? Math.round(x / t * 100) : 0;
                 setText('usdtValue', `$${currentData.stablecoin.usdt.toFixed(1)}B (${pct(currentData.stablecoin.usdt)}%)`);
                 setText('usdcValue', `$${currentData.stablecoin.usdc.toFixed(1)}B (${pct(currentData.stablecoin.usdc)}%)`);
                 setText('daiValue', `$${currentData.stablecoin.dai.toFixed(2)}B (${pct(currentData.stablecoin.dai)}%)`);
                 setHtml('stablecoinTrend', `<i class="fas fa-coins text-green-500 mr-1"></i>CoinGecko 实时市值`);
             } else {
-                stablecoinValue.textContent = '—';
+                if (stablecoinValue) stablecoinValue.textContent = '—';
                 setHtml('stablecoinTrend', `<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>稳定币暂无数据`);
             }
 
@@ -981,6 +992,7 @@
 
         async function performDataUpdate() {
             try {
+                snapshotCache = null; // re-read snapshot on each cycle if live APIs fail
                 await loadLiveData();
                 updateDashboard();
             } catch (error) {
@@ -991,13 +1003,17 @@
 
         function initializeApp() {
             setText('lastUpdate', '正在拉取官方数据…');
-            initializeCharts();
+            try {
+                initializeCharts();
+            } catch (err) {
+                console.warn('图表初始化失败（不影响数值）:', err);
+            }
             updateStatusIndicators();
             updateGauges();
             setInterval(updateCountdown, 1000);
             performDataUpdate();
             setInterval(performDataUpdate, REFRESH_SECONDS * 1000);
-            console.log('流动性监控仪表盘已启动：FRED CSV + Yahoo + CoinGecko，每', REFRESH_SECONDS, '秒刷新');
+            console.log('流动性监控仪表盘已启动：FRED / Yahoo / CoinGecko，每', REFRESH_SECONDS, '秒刷新');
         }
 
         document.addEventListener('DOMContentLoaded', initializeApp);
