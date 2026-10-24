@@ -518,7 +518,7 @@
                     </h3>
                     <p class="text-sm text-gray-600 mt-1" id="timelineMeta">加载 FRED / CoinGecko 历史序列…</p>
                 </div>
-                <div class="text-xs text-gray-500">默认「强相关」：VIX紫 · HY玫红 · BTC琥珀 · 归一化共用横轴 · 非因果</div>
+                <div class="text-xs text-gray-500">默认「强相关」：VIX紫 · HY玫红 · BTC琥珀 · 悬停/拖动十字线读原始值 · 非因果</div>
             </div>
             <div class="flex flex-wrap items-center gap-2 mb-2">
                 <span class="text-xs text-gray-500 font-semibold uppercase tracking-wide">视图</span>
@@ -1420,16 +1420,63 @@
             const canvas = document.getElementById('sharedTimelineChart');
             if (!canvas) return null;
             if (sharedTimelineChart) return sharedTimelineChart;
+            const crosshairPlugin = {
+                id: 'timelineCrosshair',
+                afterDatasetsDraw(chart) {
+                    const active = chart.tooltip && chart.tooltip.getActiveElements
+                        ? chart.tooltip.getActiveElements()
+                        : (chart._active || []);
+                    if (!active || !active.length) return;
+                    const x = active[0].element.x;
+                    const { top, bottom } = chart.chartArea;
+                    const ctx = chart.ctx;
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.setLineDash([4, 4]);
+                    ctx.lineWidth = 1.25;
+                    ctx.strokeStyle = 'rgba(51,65,85,0.9)';
+                    ctx.moveTo(x, top);
+                    ctx.lineTo(x, bottom);
+                    ctx.stroke();
+                    ctx.restore();
+                    // dots on each active series
+                    for (const a of active) {
+                        const el = a.element;
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(el.x, el.y, 3.5, 0, Math.PI * 2);
+                        ctx.fillStyle = el.options.borderColor || '#334155';
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 1.25;
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
+            };
             sharedTimelineChart = new Chart(canvas.getContext('2d'), {
                 type: 'line',
                 data: { datasets: [] },
+                plugins: [crosshairPlugin],
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
+                    interaction: { mode: 'index', intersect: false, axis: 'x' },
+                    hover: { mode: 'index', intersect: false, axis: 'x' },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            axis: 'x',
+                            backgroundColor: 'rgba(15,23,42,0.95)',
+                            titleColor: '#7dd3fc',
+                            bodyColor: '#e2e8f0',
+                            borderColor: 'rgba(100,116,139,0.8)',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: true,
                             callbacks: {
                                 title: (items) => {
                                     if (!items.length) return '';
@@ -1440,7 +1487,11 @@
                                     const raw = ctx.raw;
                                     const meta = SERIES_META[ctx.dataset.id] || {};
                                     const v = raw && raw.v != null ? raw.v : ctx.parsed.y;
-                                    let vs = typeof v === 'number' ? v.toFixed(meta.unit==='Tn'?2:meta.unit==='USD'?0:2) : v;
+                                    let vs;
+                                    if (typeof v !== 'number') vs = v;
+                                    else if (meta.unit === 'USD') vs = Math.round(v).toLocaleString('en-US');
+                                    else if (meta.unit === 'Tn') vs = v.toFixed(2);
+                                    else vs = v.toFixed(2);
                                     return `${ctx.dataset.label}: ${vs} ${meta.unit||''}`.trim();
                                 }
                             }
@@ -1462,7 +1513,7 @@
                             min: 0, max: 1,
                             ticks: { callback: (v) => (v===1?'hi':v===0?'lo':'') },
                             grid: { color: 'rgba(148,163,184,0.12)' },
-                            title: { display: true, text: '归一化', font: { size: 11 } }
+                            title: { display: true, text: '归一化 · 悬停读数', font: { size: 11 } }
                         }
                     },
                     animation: { duration: 250 }
@@ -1539,7 +1590,7 @@
             const metaEl = document.getElementById('timelineMeta');
             if (metaEl) {
                 if (!datasets.length) metaEl.textContent = '暂无可用历史点 — 检查 /api/fred 或 CoinGecko';
-                else metaEl.textContent = `FRED 净流动性约 ${nNet} 周点 · BTC ${nBtc} 日 · 勾选切换序列`;
+                else metaEl.textContent = `FRED 净流动性约 ${nNet} 周点 · BTC ${nBtc} 日 · 悬停十字线读数 · 勾选切换序列`;
             }
 
             // Correlations
