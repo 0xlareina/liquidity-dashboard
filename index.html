@@ -490,13 +490,42 @@
             return '';
         }
 
+        let snapshotCache = null;
+        async function loadSnapshot() {
+            if (snapshotCache) return snapshotCache;
+            try {
+                const r = await fetch(`${apiBase()}/data/latest.json`, { cache: 'no-store' });
+                if (!r.ok) return null;
+                snapshotCache = await r.json();
+                return snapshotCache;
+            } catch (_) {
+                return null;
+            }
+        }
+
         async function fetchFredSeries(id, limit = 60) {
-            const url = `${apiBase()}/api/fred?id=${encodeURIComponent(id)}&limit=${limit}`;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`fred ${id} http ${response.status}`);
-            const data = await response.json();
-            if (!data.latest) throw new Error(`fred ${id} empty`);
-            return data;
+            try {
+                const url = `${apiBase()}/api/fred?id=${encodeURIComponent(id)}&limit=${limit}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`fred ${id} http ${response.status}`);
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                if (!data.latest) throw new Error(`fred ${id} empty`);
+                return data;
+            } catch (err) {
+                const snap = await loadSnapshot();
+                if (snap && snap.series && snap.series[id] && snap.series[id].latest) {
+                    const s = snap.series[id];
+                    return {
+                        id,
+                        latest: s.latest,
+                        observations: (s.observations || []).slice(-limit),
+                        source: 'data/latest.json snapshot',
+                        asOf: s.asOf || s.latest.date
+                    };
+                }
+                throw err;
+            }
         }
 
         async function fetchYahoo(symbol, range = '1mo') {
@@ -507,20 +536,31 @@
         }
 
         async function fetchStablecoinData() {
-            const response = await fetch(
-                'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=tether,usd-coin,dai&order=market_cap_desc'
-            );
-            if (!response.ok) throw new Error(`coingecko http ${response.status}`);
-            const data = await response.json();
-            let total = 0, usdt = 0, usdc = 0, dai = 0;
-            data.forEach(coin => {
-                const marketCap = coin.market_cap / 1e9;
-                total += marketCap;
-                if (coin.id === 'tether') usdt = marketCap;
-                if (coin.id === 'usd-coin') usdc = marketCap;
-                if (coin.id === 'dai') dai = marketCap;
-            });
-            return { total, usdt, usdc, dai };
+            try {
+                const response = await fetch(
+                    'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=tether,usd-coin,dai&order=market_cap_desc'
+                );
+                if (!response.ok) throw new Error(`coingecko http ${response.status}`);
+                const data = await response.json();
+                let total = 0, usdt = 0, usdc = 0, dai = 0;
+                data.forEach(coin => {
+                    const marketCap = coin.market_cap / 1e9;
+                    total += marketCap;
+                    if (coin.id === 'tether') usdt = marketCap;
+                    if (coin.id === 'usd-coin') usdc = marketCap;
+                    if (coin.id === 'dai') dai = marketCap;
+                });
+                return { total, usdt, usdc, dai };
+            } catch (err) {
+                const snap = await loadSnapshot();
+                if (snap && snap.stablecoins) {
+                    const usdt = snap.stablecoins.tether?.marketCapBn || 0;
+                    const usdc = snap.stablecoins['usd-coin']?.marketCapBn || 0;
+                    const dai = snap.stablecoins.dai?.marketCapBn || 0;
+                    return { total: usdt + usdc + dai, usdt, usdc, dai };
+                }
+                throw err;
+            }
         }
 
         function fmtMoneyBn(bn, digits = 1) {

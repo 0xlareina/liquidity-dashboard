@@ -26,3 +26,13 @@
 ## 本地说明
 
 直接打开 `index.html` 时 `/api/*` 不可用。请用 Vercel 预览或 `vercel dev`。
+
+## Vercel 环境变量（建议）
+
+在 Vercel 项目 Settings → Environment Variables 设置：
+
+- `FRED_API_KEY`：在 https://fred.stlouisfed.org/docs/api/api_key.html 申请
+
+未设置时，服务端会暂时回退到仓库历史里已暴露过的 key（仅在 `/api/fred` 服务端使用，前端不再包含）。请尽快轮换并改为环境变量。
+
+`data/latest.json` 是推送时的快照兜底，当 `/api/fred` 失败时前端会读它。
