@@ -518,7 +518,14 @@
                     </h3>
                     <p class="text-sm text-gray-600 mt-1" id="timelineMeta">加载 FRED / CoinGecko 历史序列…</p>
                 </div>
-                <div class="text-xs text-gray-500">各序列按自身 min/max 归一化 · 共用横轴 · 非因果</div>
+                <div class="text-xs text-gray-500">默认「强相关」：VIX紫 · HY玫红 · BTC琥珀 · 归一化共用横轴 · 非因果</div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+                <span class="text-xs text-gray-500 font-semibold uppercase tracking-wide">视图</span>
+                <button type="button" class="series-toggle on" id="modeCorr" data-mode="corr">强相关 · VIX/HY/BTC</button>
+                <button type="button" class="series-toggle off" id="modeLiq" data-mode="liq">流动性 · NetLiq/RRP/HY</button>
+                <button type="button" class="series-toggle off" id="modeAll" data-mode="all">全部</button>
+                <span class="text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded-md px-2 py-1 ml-auto" id="corrCallout">强相关对：VIX↔HY 同向 · BTC↔VIX 反向</span>
             </div>
             <div class="flex flex-wrap gap-2 mb-3" id="timelineToggles"></div>
             <div class="timeline-wrap mb-4">
@@ -1305,13 +1312,44 @@
 
         let sharedTimelineChart = null;
         const SERIES_META = {
-            netLiq: { label: '净流动性', color: '#6366f1', unit: 'Tn' },
-            rrp: { label: 'RRP', color: '#a78bfa', unit: 'Bn' },
-            vix: { label: 'VIX', color: '#f472b6', unit: 'idx' },
-            hy: { label: 'HY OAS', color: '#fb7185', unit: '%' },
+            netLiq: { label: '净流动性', color: '#34d399', unit: 'Tn' },
+            rrp: { label: 'RRP', color: '#fbbf24', unit: 'Bn' },
+            vix: { label: 'VIX', color: '#a78bfa', unit: 'idx' },
+            hy: { label: 'HY OAS', color: '#f43f5e', unit: '%' },
             btc: { label: 'BTC', color: '#f59e0b', unit: 'USD' }
         };
-        let timelineEnabled = { netLiq: true, rrp: false, vix: true, hy: false, btc: true };
+        const TIMELINE_MODES = {
+            corr: { netLiq: false, rrp: false, vix: true, hy: true, btc: true },
+            liq:  { netLiq: true,  rrp: true,  vix: false, hy: true, btc: false },
+            all:  { netLiq: true,  rrp: true,  vix: true,  hy: true, btc: true }
+        };
+        let timelineMode = 'corr';
+        let timelineEnabled = Object.assign({}, TIMELINE_MODES.corr);
+
+        function applyTimelineMode(mode) {
+            timelineMode = mode;
+            timelineEnabled = Object.assign({}, TIMELINE_MODES[mode] || TIMELINE_MODES.corr);
+            ['corr','liq','all'].forEach(m => {
+                const el = document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1));
+                if (!el) return;
+                el.className = 'series-toggle ' + (m === mode ? 'on' : 'off');
+            });
+            updateSharedTimeline();
+        }
+
+        function wireTimelineModes() {
+            const corr = document.getElementById('modeCorr');
+            const liq = document.getElementById('modeLiq');
+            const all = document.getElementById('modeAll');
+            if (corr) corr.onclick = () => applyTimelineMode('corr');
+            if (liq) liq.onclick = () => applyTimelineMode('liq');
+            if (all) all.onclick = () => applyTimelineMode('all');
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', wireTimelineModes);
+        } else {
+            wireTimelineModes();
+        }
 
         async function fetchBtcHistory() {
             const r = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=180');
@@ -1448,6 +1486,12 @@
                 btn.textContent = `${meta.label} · ${meta.unit}`;
                 btn.onclick = () => {
                     timelineEnabled[id] = !(timelineEnabled[id] !== false);
+                    timelineMode = 'all';
+                    ['corr','liq','all'].forEach(m => {
+                        const el = document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1));
+                        if (!el) return;
+                        el.className = 'series-toggle ' + (m === 'all' ? 'on' : 'off');
+                    });
                     updateSharedTimeline();
                 };
                 box.appendChild(btn);
@@ -1474,13 +1518,14 @@
                 if (!pts.length) return;
                 const norm = normalize(pts);
                 const meta = SERIES_META[id];
+                const focus = id === 'vix' || id === 'hy' || id === 'btc';
                 datasets.push({
                     id,
                     label: meta.label,
                     data: norm.map(p => ({ x: p.t, y: p.y, v: p.v })),
                     borderColor: meta.color,
                     backgroundColor: 'transparent',
-                    borderWidth: 2,
+                    borderWidth: focus ? 2.4 : 1.6,
                     pointRadius: 0,
                     tension: 0.15,
                     spanGaps: false
@@ -1523,6 +1568,14 @@
                     const sign = pos ? '+' : '';
                     return `<div class="corr-cell" style="background:${bg}"><div class="text-sm text-gray-800">${p.a} <span class="text-gray-400">×</span> ${p.b}</div><div class="font-mono text-sm ${col} font-bold">${sign}${p.r.toFixed(3)} <span class="text-xs text-gray-500 font-normal">n=${p.n}</span></div></div>`;
                 }).join('') || '<div class="text-sm text-gray-500 py-4 text-center">尚无相关结果</div>';
+            }
+            const callout = document.getElementById('corrCallout');
+            if (callout) {
+                const find = (a,b) => corrs.find(p => (p.a===a&&p.b===b)||(p.a===b&&p.b===a));
+                const vh = find('VIX','HY OAS');
+                const bv = find('BTC','VIX');
+                const fmt = (r) => r==null ? '—' : ((r>=0?'+':'')+r.toFixed(2));
+                callout.textContent = `强相关对：VIX↔HY 同向 ${fmt(vh&&vh.r)} · BTC↔VIX 反向 ${fmt(bv&&bv.r)}`;
             }
         }
 
