@@ -431,6 +431,47 @@
             </div>
         </div>
 
+        <!-- Crypto activity mirrors (ETF / Liq / Stable circ Δ) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="etfUpdate"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">BTC ETF 净流入</h3>
+                    <span class="status-indicator" id="etfStatus"></span>
+                </div>
+                <div class="metric-value mb-2" id="etfValue" style="font-size:2rem;">—</div>
+                <div class="text-sm text-gray-600 mb-2" id="etfAsOf">US spot · 待更新</div>
+                <div class="text-xs text-gray-500" id="etfTrend">
+                    <i class="fas fa-chart-bar text-amber-500 mr-1"></i>TFTC Commoner（SoSoValue/Farside）· 流入=注入
+                </div>
+            </div>
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="liqUpdate"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">爆仓 24h</h3>
+                    <span class="status-indicator" id="liqStatus"></span>
+                </div>
+                <div class="metric-value mb-2" id="liqValue" style="font-size:2rem;">—</div>
+                <div class="text-sm text-gray-700 mb-1">BTC+ETH：<span class="font-semibold" id="liqBtcEth">—</span></div>
+                <div class="text-sm text-gray-600 mb-2" id="liqLongShort">Long / Short —</div>
+                <div class="text-xs text-gray-500" id="liqTrend">
+                    <i class="fas fa-bolt text-rose-500 mr-1"></i>MarginPad 聚合 · 放大=去杠杆压力
+                </div>
+            </div>
+            <div class="dashboard-card p-6" style="position: relative;">
+                <div class="update-indicator" id="stableDeltaUpdate"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">稳定币流通 Δ1d</h3>
+                    <span class="status-indicator" id="stableDeltaStatus"></span>
+                </div>
+                <div class="metric-value mb-2" id="stableDeltaValue" style="font-size:2rem;">—</div>
+                <div class="text-sm text-gray-600 mb-2">USDT+USDC circulating · <strong>≠交易所净流入</strong></div>
+                <div class="text-xs text-gray-500" id="stableDeltaTrend">
+                    <i class="fas fa-coins text-violet-500 mr-1"></i>DefiLlama · 代理指标
+                </div>
+            </div>
+        </div>
+
         <!-- Comprehensive Analysis -->
         <div class="dashboard-card p-6 mb-6">
             <h3 class="text-xl font-bold text-gray-800 mb-4">
@@ -552,6 +593,9 @@
             curve: { us2y: null, us10y: null, slopeBp: null, asOf: null },
             aave: { usdtB: null, usdtS: null, usdcB: null, usdcS: null, blend: null },
             tgaWowBn: null,
+            etf: { netFlowUsd: null, asOf: null },
+            liq: { total: null, btcEth: null, longUsd: null, shortUsd: null },
+            stableDeltaBn: null,
             sourceNotes: []
         };
 
@@ -717,6 +761,58 @@
             return Math.round(((latest.value - best.value) / 1000) * 10) / 10;
         }
 
+
+        function fmtUsdCompact(n) {
+            if (n == null || !Number.isFinite(n)) return '—';
+            const sign = n < 0 ? '-' : '';
+            const a = Math.abs(n);
+            if (a >= 1e9) return sign + '$' + (a / 1e9).toFixed(2) + 'B';
+            if (a >= 1e6) return sign + '$' + (a / 1e6).toFixed(2) + 'M';
+            if (a >= 1e3) return sign + '$' + (a / 1e3).toFixed(0) + 'K';
+            return sign + '$' + a.toFixed(0);
+        }
+
+        async function fetchEtfFlows() {
+            const r = await fetch('https://www.tftc.io/bitcoin-etf-flows/latest.json');
+            if (!r.ok) throw new Error('tftc http ' + r.status);
+            const j = await r.json();
+            const s = j.latestSession || j.latestPerFund;
+            if (!s || s.netFlowUsd == null) throw new Error('tftc empty');
+            return { netFlowUsd: Number(s.netFlowUsd), asOf: String(s.date || j.updatedThrough || '') };
+        }
+
+        async function fetchLiq24h() {
+            const r = await fetch('https://marginpad.io/api/v1/liquidations');
+            if (!r.ok) throw new Error('marginpad http ' + r.status);
+            const j = await r.json();
+            if (!j || !j.ok || !j.data) throw new Error('marginpad empty');
+            const m = j.data.market || {};
+            const coins = j.data.coins || [];
+            const btc = coins.find(c => c.s === 'BTC');
+            const eth = coins.find(c => c.s === 'ETH');
+            const btcEth = (btc ? Number(btc.liq) : 0) + (eth ? Number(eth.liq) : 0);
+            return {
+                total: Number(m.total) || null,
+                btcEth: btcEth || null,
+                longUsd: Number(m.long) || null,
+                shortUsd: Number(m.short) || null
+            };
+        }
+
+        async function fetchStableCircDelta() {
+            const [u, c] = await Promise.all([
+                fetch('https://stablecoins.llama.fi/stablecoincharts/all?stablecoin=1').then(r => { if (!r.ok) throw new Error('llama usdt ' + r.status); return r.json(); }),
+                fetch('https://stablecoins.llama.fi/stablecoincharts/all?stablecoin=2').then(r => { if (!r.ok) throw new Error('llama usdc ' + r.status); return r.json(); })
+            ]);
+            const delta = (arr) => {
+                if (!arr || arr.length < 2) return 0;
+                const a = arr[arr.length - 2].totalCirculating.peggedUSD;
+                const b = arr[arr.length - 1].totalCirculating.peggedUSD;
+                return (Number(b) - Number(a)) / 1e9;
+            };
+            return Math.round((delta(u) + delta(c)) * 100) / 100;
+        }
+
         async function loadLiveData() {
             const notes = [];
             const tasks = {
@@ -734,7 +830,10 @@
                 brent: fetchYahoo('BZ=F', '5d').catch(e => { notes.push('Brent: ' + e.message); return null; }),
                 dgs2: fetchFredSeries(SERIES.DGS2, 30).catch(e => { notes.push('DGS2: ' + e.message); return null; }),
                 dgs10: fetchFredSeries(SERIES.DGS10, 30).catch(e => { notes.push('DGS10: ' + e.message); return null; }),
-                aave: fetchAaveRates().catch(e => { notes.push('Aave: ' + e.message); return null; })
+                aave: fetchAaveRates().catch(e => { notes.push('Aave: ' + e.message); return null; }),
+                etf: fetchEtfFlows().catch(e => { notes.push('ETF: ' + e.message); return null; }),
+                liq: fetchLiq24h().catch(e => { notes.push('Liq: ' + e.message); return null; }),
+                stableDelta: fetchStableCircDelta().catch(e => { notes.push('StableΔ: ' + e.message); return null; })
             };
 
             const results = {};
@@ -801,6 +900,9 @@
             if (results.tga && results.tga.observations) {
                 currentData.tgaWowBn = tgaWowFromObs(results.tga.observations);
             }
+            if (results.etf) currentData.etf = results.etf;
+            if (results.liq) currentData.liq = results.liq;
+            if (results.stableDelta != null) currentData.stableDeltaBn = results.stableDelta;
 
             // Net liquidity = WALCL - TGA - RRP (all in billions) -> display in trillions
             if (currentData.walcl.valueBn != null && currentData.tga.valueBn != null && currentData.rrp.value != null) {
@@ -817,7 +919,7 @@
 
         function updateDashboard() {
             document.getElementById('updateIndicator').classList.add('active');
-            ['rrpUpdate','sofrUpdate','vixUpdate','moveUpdate','netLiqUpdate','spreadUpdate','stablecoinUpdate','spUpdate','oilUpdate','curveUpdate','aaveUpdate','tgaWowUpdate']
+            ['rrpUpdate','sofrUpdate','vixUpdate','moveUpdate','netLiqUpdate','spreadUpdate','stablecoinUpdate','spUpdate','oilUpdate','curveUpdate','aaveUpdate','tgaWowUpdate','etfUpdate','liqUpdate','stableDeltaUpdate']
                 .forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('active'); });
 
             // RRP (billions)
@@ -884,7 +986,7 @@
                 setText('usdtValue', `$${currentData.stablecoin.usdt.toFixed(1)}B (${pct(currentData.stablecoin.usdt)}%)`);
                 setText('usdcValue', `$${currentData.stablecoin.usdc.toFixed(1)}B (${pct(currentData.stablecoin.usdc)}%)`);
                 setText('daiValue', `$${currentData.stablecoin.dai.toFixed(2)}B (${pct(currentData.stablecoin.dai)}%)`);
-                setHtml('stablecoinTrend', `<i class="fas fa-coins text-green-500 mr-1"></i>CoinGecko 实时市值`);
+                setHtml('stablecoinTrend', `<i class="fas fa-coins text-green-500 mr-1"></i>CoinGecko 市值存量（≠交易所净流入）`);
             } else {
                 if (stablecoinValue) stablecoinValue.textContent = '—';
                 setHtml('stablecoinTrend', `<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>稳定币暂无数据`);
@@ -940,6 +1042,26 @@
             setHtml('tgaWowTrend', tw != null
                 ? '<i class="fas fa-university text-blue-500 mr-1"></i>FRED WTREGEN 周变化 · ' + (tw > 0 ? '抽流动性' : '回补流动性')
                 : '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>TGA WoW 暂无数据');
+
+            // ETF / Liq / Stable circ Δ
+            setText('etfValue', currentData.etf.netFlowUsd != null ? fmtUsdCompact(currentData.etf.netFlowUsd) : '—');
+            setText('etfAsOf', currentData.etf.asOf ? ('截至 ' + currentData.etf.asOf + ' · US spot BTC ETF') : 'US spot · 暂无');
+            setHtml('etfTrend', currentData.etf.netFlowUsd != null
+                ? '<i class="fas fa-chart-bar text-amber-500 mr-1"></i>TFTC Commoner · ' + (currentData.etf.netFlowUsd >= 0 ? '净流入=注入' : '净流出=抽离')
+                : '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>ETF 暂无数据');
+            setText('liqValue', currentData.liq.total != null ? fmtUsdCompact(currentData.liq.total) : '—');
+            setText('liqBtcEth', currentData.liq.btcEth != null ? fmtUsdCompact(currentData.liq.btcEth) : '—');
+            setText('liqLongShort', (currentData.liq.longUsd != null)
+                ? ('Long ' + fmtUsdCompact(currentData.liq.longUsd) + ' / Short ' + fmtUsdCompact(currentData.liq.shortUsd))
+                : 'Long / Short —');
+            setHtml('liqTrend', currentData.liq.total != null
+                ? '<i class="fas fa-bolt text-rose-500 mr-1"></i>MarginPad 24h 聚合 · 放大=去杠杆压力'
+                : '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>爆仓暂无数据');
+            const sd = currentData.stableDeltaBn;
+            setText('stableDeltaValue', sd != null ? ((sd > 0 ? '+' : '') + '$' + sd.toFixed(2) + 'B') : '—');
+            setHtml('stableDeltaTrend', sd != null
+                ? '<i class="fas fa-coins text-violet-500 mr-1"></i>DefiLlama circulating Δ · 代理≠CEX净流入'
+                : '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>流通Δ暂无数据');
 
             setHtml('netLiqTrend', currentData.netLiq.valueTn != null
                 ? `<i class="fas fa-check text-green-500 mr-1"></i>WALCL − TGA − RRP（十亿美元口径）`

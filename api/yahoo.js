@@ -49,8 +49,8 @@ export default async function handler(req, res) {
       previousClose: meta.previousClose ?? null,
       currency: meta.currency ?? null,
       volume: lastVol,
-      closes: closes.slice(-30),
-      timestamps: timestamps.slice(-30),
+      closes: closes.slice(-180),
+      timestamps: timestamps.slice(-180),
       source: 'query1.finance.yahoo.com',
     });
   } catch (err) {
